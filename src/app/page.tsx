@@ -164,7 +164,7 @@ function RecordForm() {
   const [inputQty,setInputQty]=useState(0); const [goodQty,setGoodQty]=useState(0); const [defectQty,setDefectQty]=useState(0)
   const [defects,setDefects]=useState<string[]>([]); const [materials,setMaterials]=useState<Material[]>([])
   const [selMats,setSelMats]=useState<string[]>([]); const [stSeconds,setStSeconds]=useState(0)
-  const [photos,setPhotos]=useState<string[]>([]); const [memo,setMemo]=useState('')
+  const [photos,setPhotos]=useState<string[]>([]); const [videoUrl,setVideoUrl]=useState(''); const [memo,setMemo]=useState('')
   const [submitting,setSubmitting]=useState(false); const [plansLoading,setPlansLoading]=useState(true)
   const [showCompleted,setShowCompleted]=useState(false)
   const [now,setNow]=useState(new Date())
@@ -208,7 +208,7 @@ function RecordForm() {
         item_name:selPlan.item_name, production_line:selPlan.production_line, shift:selPlan.shift,
         input_qty:mode!=='quick'?inputQty:null, good_qty:mode!=='quick'?goodQty:null,
         defect_qty:defectQty||null, defect_types:defects, defect_materials:selMats,
-        st_seconds:mode!=='quick'&&stSeconds>0?stSeconds:null, photo_urls:photos, memo:memo||null })})
+        st_seconds:mode!=='quick'&&stSeconds>0?stSeconds:null, photo_urls:photos, video_url:videoUrl||null, memo:memo||null })})
     const data=await res.json()
     if(data.ok){
       const q=new URLSearchParams({ mode, item_code:selPlan.item_code, color_code:selPlan.color_code,
@@ -398,7 +398,20 @@ function RecordForm() {
         <PhotoUpload photos={photos} onPhotos={setPhotos} />
       </Section>
 
-      <Section title={mode==='quick'?'⑤ 특이사항 (선택)':'⑤ 특이사항 (선택)'}>
+      <Section title={mode==='quick'?'⑤ 작업 동영상 (선택)':'⑤ 작업 동영상 (선택)'}>
+        <p className="text-xs text-gray-400 mb-2">YouTube에 올린 뒤 링크를 붙여넣으세요</p>
+        <input type="url" value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}
+          placeholder="https://youtube.com/..."
+          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-700 bg-white" />
+        {videoUrl&&(
+          <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+            className="mt-2 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl text-sm text-red-600 font-medium">
+            <span className="text-lg">▶</span> 링크 확인하기 ↗
+          </a>
+        )}
+      </Section>
+
+      <Section title={mode==='quick'?'⑥ 특이사항 (선택)':'⑥ 특이사항 (선택)'}>
         <textarea className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:border-green-700 resize-none bg-white"
           rows={3} placeholder="설비 이상, 자재 교체, 특이사항 등..." value={memo} onChange={e=>setMemo(e.target.value)} />
       </Section>

@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     defect_materials: body.defect_materials?.join(',') ?? null,
     st_seconds: body.st_seconds ?? null,
     photo_urls: photoUrls.length ? photoUrls.join(',') : null,
+    video_url: body.video_url ?? null,
     memo: body.memo ?? null,
   }).select().single()
 
