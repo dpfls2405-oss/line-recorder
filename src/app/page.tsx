@@ -168,7 +168,8 @@ function RecordForm() {
   const [submitting,setSubmitting]=useState(false); const [plansLoading,setPlansLoading]=useState(true)
   const [showCompleted,setShowCompleted]=useState(false)
   const [now,setNow]=useState(new Date())
-  const [filterDate,setFilterDate]=useState('')
+  const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`
+  const [filterDate,setFilterDate]=useState(todayStr)
   const [filterLine,setFilterLine]=useState('')
 
   useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),1000); return ()=>clearInterval(t) },[])
@@ -180,7 +181,6 @@ function RecordForm() {
     setPlansLoading(true)
     let q=supabase.from('production_plans').select('*').eq('status','active').order('pack_plan_date')
     if(filterDate){ q=q.eq('pack_plan_date',filterDate) }
-    else { const since=new Date(); since.setDate(since.getDate()-14); q=q.gte('pack_plan_date',since.toISOString().slice(0,10)) }
     if(lineParam) q=q.ilike('production_line',`%${lineParam}%`)
     const { data }=await q; const p=data??[]
     setPlans(p); if(p.length>0){ setSelPlan(p[0]); setInputQty(p[0].plan_qty||0); setGoodQty(p[0].plan_qty||0) }
@@ -267,7 +267,7 @@ function RecordForm() {
           )}
         </div>
         {/* 라인 필터 */}
-        {allLines.length>1&&(
+        {allLines.length>0&&(
           <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1">
             <button onClick={()=>setFilterLine('')}
               className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium border ${filterLine===''?'bg-green-700 text-white border-green-700':'bg-white text-gray-600 border-gray-200'}`}>
