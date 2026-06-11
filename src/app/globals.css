@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Noto Sans KR', system-ui, sans-serif; background: #f3f4f6; }
+
+.counter-btn {
+  @apply w-12 h-12 rounded-xl border-none cursor-pointer flex items-center justify-center text-2xl font-light flex-shrink-0;
+}
+.input-num {
+  @apply flex-1 text-center text-3xl font-medium border-2 border-gray-200 rounded-xl py-2 focus:outline-none focus:border-green-700;
+}
+.chip {
+  @apply px-4 py-2 rounded-full border-2 border-gray-200 text-sm font-medium cursor-pointer transition-all bg-white text-gray-700;
+}
+.chip.on { @apply border-green-600 bg-green-600 text-white; }
+.defect-chip {
+  @apply py-3 px-1 rounded-xl border-2 border-gray-200 text-center text-sm font-medium cursor-pointer transition-all bg-white text-gray-600;
+}
+.defect-chip.on { @apply border-red-500 bg-red-50 text-red-700; }

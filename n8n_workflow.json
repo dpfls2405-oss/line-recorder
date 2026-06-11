@@ -1,0 +1,94 @@
+{
+  "name": "Line Recorder → Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "line-recorder",
+        "responseMode": "lastNode"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "생산기록",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "날짜": "={{ $json.date }}",
+            "시각": "={{ $json.time }}",
+            "모드": "={{ $json.mode }}",
+            "라인": "={{ $json.line }}",
+            "작업자": "={{ $json.worker }}",
+            "제품": "={{ $json.product }}",
+            "투입수량": "={{ $json.input_qty }}",
+            "양품수량": "={{ $json.good_qty }}",
+            "불량수량": "={{ $json.defect_qty }}",
+            "수율(%)": "={{ $json.yield_pct }}",
+            "불량유형": "={{ $json.defect_types }}",
+            "ST(초)": "={{ $json.st_seconds }}",
+            "특이사항": "={{ $json.memo }}",
+            "사진수": "={{ $json.photo_count }}"
+          }
+        }
+      },
+      "name": "Append to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Append to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
