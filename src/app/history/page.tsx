@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 const ML: Record<string,string> = { quick:'빠른불량', lot:'로트마감' }
 const MC: Record<string,string> = { quick:'bg-amber-100 text-amber-800', lot:'bg-blue-100 text-blue-800' }
@@ -91,13 +90,11 @@ export default function HistoryPage() {
 
   async function load() {
     setLoading(true)
-    let q=supabase.from('line_records').select('*').order('recorded_at',{ascending:false})
-    if(filter==='today'){ const s=new Date(); s.setHours(0,0,0,0); q=q.gte('recorded_at',s.toISOString()) }
-    else if(filter==='week'){ const s=new Date(); s.setDate(s.getDate()-7); q=q.gte('recorded_at',s.toISOString()) }
-    else if(filter==='custom'){
-      q=q.gte('recorded_at',`${dateFrom}T00:00:00`).lte('recorded_at',`${dateTo}T23:59:59`)
-    }
-    const { data }=await q.limit(500); setRecords(data??[]); setLoading(false)
+    const params=new URLSearchParams({ filter })
+    if(filter==='custom'){ params.set('dateFrom',dateFrom); params.set('dateTo',dateTo) }
+    const res=await fetch(`/api/records?${params.toString()}`)
+    const data=res.ok?await res.json():[]
+    setRecords(data); setLoading(false)
   }
 
   const allLines = Array.from(new Set(records.map(r=>r.production_line||'미지정'))).sort()

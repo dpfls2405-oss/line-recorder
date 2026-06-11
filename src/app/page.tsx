@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DEFECT_TYPES, RECORD_MODES } from '@/lib/config'
-import { supabase } from '@/lib/supabase'
 
 type Mode = 'quick' | 'lot'
 type Plan = { id:string; item_code:string; color_code:string; item_name:string; production_line:string; pack_plan_date:string; plan_qty:number; shift:string; lot_number:string; status:string }
@@ -179,10 +178,11 @@ function RecordForm() {
 
   async function loadPlans() {
     setPlansLoading(true)
-    let q=supabase.from('production_plans').select('*').eq('status','active').order('pack_plan_date')
-    if(filterDate){ q=q.eq('pack_plan_date',filterDate) }
-    if(lineParam) q=q.ilike('production_line',`%${lineParam}%`)
-    const { data }=await q; const p=data??[]
+    const params=new URLSearchParams()
+    if(filterDate) params.set('date',filterDate)
+    if(lineParam) params.set('line',lineParam)
+    const res=await fetch(`/api/plans?${params.toString()}`)
+    const p=res.ok?await res.json():[]
     setPlans(p); if(p.length>0){ setSelPlan(p[0]); setInputQty(p[0].plan_qty||0); setGoodQty(p[0].plan_qty||0) }
     setPlansLoading(false)
   }
@@ -191,8 +191,9 @@ function RecordForm() {
   const visiblePlans = plans.filter(p=> p.status!=='completed' && (filterLine===''||p.production_line===filterLine))
   const completedPlans = plans.filter(p=> p.status==='completed' && (filterLine===''||p.production_line===filterLine))
   async function loadBom(itemCode:string,colorCode:string) {
-    const { data }=await supabase.from('bom').select('materials(id,material_code,material_color,material_name,material_category)').eq('item_code',itemCode).eq('color_code',colorCode).eq('is_active',true)
-    setMaterials(((data??[]).map((b:any)=>b.materials).filter(Boolean)) as Material[])
+    const res=await fetch(`/api/bom?item_code=${encodeURIComponent(itemCode)}&color_code=${encodeURIComponent(colorCode)}`)
+    const data=res.ok?await res.json():[]
+    setMaterials(data as Material[])
   }
   function toggleDefect(k:string){ setDefects(p=>p.includes(k)?p.filter(d=>d!==k):[...p,k]) }
   function toggleMat(key:string){ setSelMats(p=>p.includes(key)?p.filter(c=>c!==key):[...p,key]) }
