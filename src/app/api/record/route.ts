@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     memo: body.memo ?? null,
   }).select().single()
 
-  if (error) return NextResponse.json({ ok: false, error }, { status: 500 })
+  if (error) return NextResponse.json({ ok: false, error: '저장 실패' }, { status: 500 })
 
   return NextResponse.json({ ok: true, id: data.id })
 }
