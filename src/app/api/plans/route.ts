@@ -5,12 +5,17 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const line = searchParams.get('line')
   const date = searchParams.get('date')
+  const dateFrom = searchParams.get('dateFrom')
+  const dateTo = searchParams.get('dateTo')
 
   try {
     let query = `SELECT * FROM production_plans WHERE status='active'`
     const params: any[] = []
 
-    if (date) {
+    if (dateFrom && dateTo) {
+      params.push(dateFrom); query += ` AND pack_plan_date>=$${params.length}`
+      params.push(dateTo); query += ` AND pack_plan_date<=$${params.length}`
+    } else if (date) {
       params.push(date)
       query += ` AND pack_plan_date=$${params.length}`
     }

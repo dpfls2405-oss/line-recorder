@@ -199,6 +199,7 @@ export default function HistoryPage() {
                       <span className="text-sm font-medium truncate">{r.production_line??'미지정'}</span>
                     </div>
                     <div className="text-xs font-mono text-gray-400">{r.item_code} / {r.color_code} <span className="font-sans ml-1">{t.getHours().toString().padStart(2,'0')}:{t.getMinutes().toString().padStart(2,'0')}</span></div>
+                    {r.item_name&&<div className="text-xs text-gray-500 mt-0.5 truncate">{r.item_name}</div>}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {pList.length>0&&<span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">📷 {pList.length}</span>}

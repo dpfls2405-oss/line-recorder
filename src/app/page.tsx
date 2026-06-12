@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { DEFECT_TYPES, RECORD_MODES } from '@/lib/config'
+import { supabase } from '@/lib/supabase'
 
 type Mode = 'quick' | 'lot'
 type Plan = { id:string; item_code:string; color_code:string; item_name:string; production_line:string; pack_plan_date:string; plan_qty:number; shift:string; lot_number:string; status:string }
@@ -168,18 +169,19 @@ function RecordForm() {
   const [showCompleted,setShowCompleted]=useState(false)
   const [now,setNow]=useState(new Date())
   const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`
-  const [filterDate,setFilterDate]=useState(todayStr)
+  const [dateFrom,setDateFrom]=useState(todayStr)
+  const [dateTo,setDateTo]=useState(todayStr)
   const [filterLine,setFilterLine]=useState('')
 
   useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),1000); return ()=>clearInterval(t) },[])
-  useEffect(()=>{ loadPlans() },[filterDate])
+  useEffect(()=>{ loadPlans() },[dateFrom,dateTo])
   useEffect(()=>{ if(selPlan){ loadBom(selPlan.item_code,selPlan.color_code); setSelMats([]) } },[selPlan])
   useEffect(()=>{ if(mode!=='quick') setDefectQty(Math.max(0,inputQty-goodQty)) },[goodQty,inputQty,mode])
 
   async function loadPlans() {
     setPlansLoading(true)
     const params=new URLSearchParams()
-    if(filterDate) params.set('date',filterDate)
+    if(dateFrom&&dateTo) { params.set('dateFrom',dateFrom); params.set('dateTo',dateTo) }
     if(lineParam) params.set('line',lineParam)
     const res=await fetch(`/api/plans?${params.toString()}`)
     const p=res.ok?await res.json():[]
@@ -256,16 +258,23 @@ function RecordForm() {
       </div>
 
       <Section title="① 시양산 제품 선택">
-        {/* 날짜 필터 */}
-        <div className="flex gap-2 mb-3 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)}
-              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-700 bg-white" />
+        {/* 날짜 기간 필터 */}
+        <div className="mb-3">
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            <button onClick={()=>{setDateFrom(todayStr);setDateTo(todayStr)}}
+              className={`px-3 py-1 rounded-full text-xs font-medium border ${dateFrom===todayStr&&dateTo===todayStr?'bg-green-700 text-white border-green-700':'bg-white text-gray-600 border-gray-200'}`}>오늘</button>
+            <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-6);setDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);setDateTo(todayStr)}}
+              className="px-3 py-1 rounded-full text-xs font-medium border bg-white text-gray-600 border-gray-200">최근 7일</button>
+            <button onClick={()=>{setDateFrom('');setDateTo('')}}
+              className={`px-3 py-1 rounded-full text-xs font-medium border ${!dateFrom&&!dateTo?'bg-green-700 text-white border-green-700':'bg-white text-gray-600 border-gray-200'}`}>전체</button>
           </div>
-          {filterDate&&(
-            <button onClick={()=>setFilterDate('')}
-              className="px-3 py-2 rounded-xl border-2 border-gray-200 text-xs text-gray-500 bg-white whitespace-nowrap">전체</button>
-          )}
+          <div className="flex items-center gap-2">
+            <input type="date" value={dateFrom} max={dateTo||undefined} onChange={e=>{setDateFrom(e.target.value); if(!dateTo)setDateTo(e.target.value)}}
+              className="flex-1 min-w-0 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-700 bg-white" />
+            <span className="text-gray-400 text-sm">~</span>
+            <input type="date" value={dateTo} min={dateFrom||undefined} onChange={e=>{setDateTo(e.target.value); if(!dateFrom)setDateFrom(e.target.value)}}
+              className="flex-1 min-w-0 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-700 bg-white" />
+          </div>
         </div>
         {/* 라인 필터 */}
         {allLines.length>0&&(

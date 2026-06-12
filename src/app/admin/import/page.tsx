@@ -9,23 +9,39 @@ function StatusBadge({ s }: { s:string }) {
 }
 
 export default function ImportPage() {
-  const [planStatus,setPlanStatus]=useState('idle'); const [planRows,setPlanRows]=useState<any[]>([]); const [planMsg,setPlanMsg]=useState('')
+  const [planStatus,setPlanStatus]=useState('idle'); const [planRows,setPlanRows]=useState<any[]>([]); const [planMsg,setPlanMsg]=useState(''); const [planKind,setPlanKind]=useState<'assembly'|'process'|''>('')
   const [bomStatus,setBomStatus]=useState('idle'); const [bomRows,setBomRows]=useState<any[]>([]); const [bomMsg,setBomMsg]=useState('')
   const [bomProgress,setBomProgress]=useState(0)
   const planRef=useRef<HTMLInputElement>(null); const bomRef=useRef<HTMLInputElement>(null)
 
   async function parsePlans(file:File) {
-    setPlanStatus('parsing'); setPlanMsg('')
+    setPlanStatus('parsing'); setPlanMsg(''); setPlanKind('')
     try {
       const XLSX=await import('xlsx'); const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:'array',cellDates:true}); const ws=wb.Sheets[wb.SheetNames[0]]
       const raw:any[]=XLSX.utils.sheet_to_json(ws,{defval:null})
-      const rows=raw.filter(r=>r['품목코드']&&r['품목코드']!=='Total').map(r=>({
-        item_code:String(r['품목코드']??'').trim(), color_code:String(r['색상']??'').trim(), item_name:String(r['단품명칭']??'').trim(),
-        production_line:String(r['생산라인']??'').trim(), line_code:String(r['생산라인코드']??'').trim(),
-        pack_plan_date:r['포장계획일']?(r['포장계획일'] instanceof Date?r['포장계획일'].toISOString().slice(0,10):String(r['포장계획일']).slice(0,10)):'',
-        first_pack_date:r['최초포장계획일']?(r['최초포장계획일'] instanceof Date?r['최초포장계획일'].toISOString().slice(0,10):String(r['최초포장계획일']).slice(0,10)):'',
-        plan_qty:parseInt(r['계획량'])||0, partner:String(r['협력사']??'').trim(), shift:String(r['Shift']??'').trim(), lot_number:String(r['Lot번호']??'').trim(),
-      })).filter(r=>r.item_code)
+      const toDate=(v:any)=>v?(v instanceof Date?v.toISOString().slice(0,10):String(v).slice(0,10)):''
+      // 가공 파일은 '부품코드' 컬럼, 조립 파일은 '품목코드' 컬럼으로 자동 구분
+      const isProcess = raw.length>0 && raw.some(r=>r['부품코드'])
+      let rows:any[]
+      if (isProcess) {
+        rows=raw.filter(r=>r['부품코드']&&r['부품코드']!=='Total').map(r=>({
+          item_code:String(r['부품코드']??'').trim(), color_code:String(r['부품색상']??'').trim(), item_name:String(r['부품명']??'').trim(),
+          // 가공: 생산라인=작업설비(공정), line_code=현공정
+          production_line:String(r['작업설비']??'').trim(), line_code:String(r['현공정']??'').trim(),
+          pack_plan_date:toDate(r['투입일자']), first_pack_date:toDate(r['최초투입일자']),
+          plan_qty:parseInt(r['계획량'])||0, partner:String(r['청구자']??'').trim(),
+          shift:String(r['SHIFT_가공']??r['SHIFT_포장']??'').trim(), lot_number:String(r['Lotno']??'').trim(),
+        })).filter(r=>r.item_code)
+        setPlanKind('process')
+      } else {
+        rows=raw.filter(r=>r['품목코드']&&r['품목코드']!=='Total').map(r=>({
+          item_code:String(r['품목코드']??'').trim(), color_code:String(r['색상']??'').trim(), item_name:String(r['단품명칭']??'').trim(),
+          production_line:String(r['생산라인']??'').trim(), line_code:String(r['생산라인코드']??'').trim(),
+          pack_plan_date:toDate(r['포장계획일']), first_pack_date:toDate(r['최초포장계획일']),
+          plan_qty:parseInt(r['계획량'])||0, partner:String(r['협력사']??'').trim(), shift:String(r['Shift']??'').trim(), lot_number:String(r['Lot번호']??'').trim(),
+        })).filter(r=>r.item_code)
+        setPlanKind('assembly')
+      }
       setPlanRows(rows); setPlanStatus('preview')
     } catch(e:any){ setPlanStatus('error'); setPlanMsg('파싱 오류: '+e.message) }
   }
@@ -94,7 +110,8 @@ export default function ImportPage() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
           <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-700 text-sm font-bold">XL</div>
-          <div className="flex-1"><h2 className="text-sm font-medium text-gray-900">시양산 투입 계획 등록</h2><p className="text-xs text-gray-400 mt-0.5">Grid00_날짜.xls 파일 업로드</p></div>
+          <div className="flex-1"><h2 className="text-sm font-medium text-gray-900">생산 계획 등록 <span className="text-xs font-normal text-gray-400">(조립·가공 자동 감지)</span></h2><p className="text-xs text-gray-400 mt-0.5">조립/가공 계획 .xls 파일 업로드 — 부품코드 유무로 자동 구분</p></div>
+          {planKind&&(planStatus==='preview'||planStatus==='uploading')&&<span className={`text-xs px-2 py-0.5 rounded font-medium ${planKind==='process'?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700'}`}>{planKind==='process'?'가공':'조립'}</span>}
           <StatusBadge s={planStatus} />
         </div>
         <div className="p-5 space-y-4">
@@ -106,13 +123,13 @@ export default function ImportPage() {
             </div>
           )}
           {planStatus==='parsing'&&<p className="text-sm text-blue-600">파일 분석 중...</p>}
-          {planStatus==='done'&&<div className="flex items-center gap-3"><span className="text-sm text-green-700 font-medium">✓ {planMsg}</span><button onClick={()=>{setPlanStatus('idle');setPlanRows([]);setPlanMsg('')}} className="text-xs text-gray-400 hover:text-gray-600">다시 업로드</button></div>}
+          {planStatus==='done'&&<div className="flex items-center gap-3"><span className="text-sm text-green-700 font-medium">✓ {planMsg}</span><button onClick={()=>{setPlanStatus('idle');setPlanRows([]);setPlanMsg('');setPlanKind('')}} className="text-xs text-gray-400 hover:text-gray-600">다시 업로드</button></div>}
           {(planStatus==='preview'||planStatus==='uploading')&&(
             <div>
               <div className="overflow-x-auto border border-gray-200 rounded-lg mb-3">
                 <table className="text-xs w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>{['품목코드','색상','단품명칭','생산라인','포장계획일','계획량','Shift','Lot번호'].map(h=><th key={h} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}</tr>
+                    <tr>{(planKind==='process'?['부품코드','색상','부품명','생산라인(설비)','투입일자','계획량','Shift','Lot']:['품목코드','색상','단품명칭','생산라인','포장계획일','계획량','Shift','Lot번호']).map(h=><th key={h} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {planRows.slice(0,8).map((r,i)=>(
