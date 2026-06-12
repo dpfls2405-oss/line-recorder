@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -9,12 +9,15 @@ export async function GET(req: NextRequest) {
   if (!itemCode || !colorCode) return NextResponse.json([])
 
   try {
-    const { rows } = await pool.query(
-      `SELECT m.id, m.material_code, m.material_color, m.material_name, m.material_category
-       FROM bom b JOIN materials m ON b.material_id = m.id
-       WHERE b.item_code=$1 AND b.color_code=$2 AND b.is_active=true`,
-      [itemCode, colorCode]
-    )
+    const { data, error } = await supabase
+      .from('bom')
+      .select('materials(id, material_code, material_color, material_name, material_category)')
+      .eq('item_code', itemCode)
+      .eq('color_code', colorCode)
+      .eq('is_active', true)
+
+    if (error) throw error
+    const rows = (data ?? []).map((r: any) => r.materials).filter(Boolean)
     return NextResponse.json(rows)
   } catch (e) {
     return NextResponse.json([])

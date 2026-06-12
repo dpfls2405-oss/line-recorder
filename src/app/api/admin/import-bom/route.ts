@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pool from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   const rows = await req.json()
@@ -9,20 +9,17 @@ export async function POST(req: NextRequest) {
       material_name: r.material_name, material_category: r.material_category ?? null,
     }])).values()) as any[]
 
-    for (const m of uniqueMats) {
-      await pool.query(
-        `INSERT INTO materials (material_code, material_color, material_name, material_category)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (material_code, material_color) DO UPDATE
-         SET material_name=EXCLUDED.material_name, material_category=EXCLUDED.material_category`,
-        [m.material_code, m.material_color, m.material_name, m.material_category]
-      )
-    }
+    const { error: matErr } = await supabase
+      .from('materials')
+      .upsert(uniqueMats, { onConflict: 'material_code,material_color' })
+    if (matErr) throw matErr
 
-    const { rows: matData } = await pool.query(
-      `SELECT id, material_code, material_color FROM materials`
-    )
-    const matMap = new Map(matData.map((m: any) => [`${m.material_code}::${m.material_color}`, m.id]))
+    const { data: matData, error: matFetchErr } = await supabase
+      .from('materials')
+      .select('id, material_code, material_color')
+    if (matFetchErr) throw matFetchErr
+
+    const matMap = new Map((matData ?? []).map((m: any) => [`${m.material_code}::${m.material_color}`, m.id]))
 
     const bomPayload = rows.map((r: any) => ({
       item_code: r.item_code, color_code: r.color_code,
@@ -30,17 +27,13 @@ export async function POST(req: NextRequest) {
       quantity: r.quantity ?? 1,
     })).filter((r: any) => r.material_id)
 
-    for (const b of bomPayload) {
-      await pool.query(
-        `INSERT INTO bom (item_code, color_code, material_id, quantity)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (item_code, color_code, material_id) DO NOTHING`,
-        [b.item_code, b.color_code, b.material_id, b.quantity]
-      )
-    }
+    const { error: bomErr } = await supabase
+      .from('bom')
+      .upsert(bomPayload, { onConflict: 'item_code,color_code,material_id', ignoreDuplicates: true })
+    if (bomErr) throw bomErr
 
     return NextResponse.json({ ok: true, materials: uniqueMats.length, bom_rows: bomPayload.length })
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: '저장 실패' }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: '저장 실패: ' + (e?.message ?? e) }, { status: 500 })
   }
 }
