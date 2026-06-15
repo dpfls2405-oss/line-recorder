@@ -45,7 +45,23 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
             {record.defect_types&&<div className="flex justify-between py-1.5 border-b border-gray-50"><span className="text-gray-400">불량유형</span><span className="text-red-600 font-medium">{record.defect_types}</span></div>}
             {record.defect_materials&&<div className="flex justify-between items-start py-1.5 border-b border-gray-50 gap-4"><span className="text-gray-400 flex-shrink-0">불량자재</span><span className="text-xs text-orange-600 text-right">{record.defect_materials}</span></div>}
             {record.st_seconds!=null&&<div className="flex justify-between py-1.5 border-b border-gray-50"><span className="text-gray-400">ST</span><span className="font-mono font-medium">{Math.floor(record.st_seconds/60)}분 {Math.round(record.st_seconds%60)}초 <span className="text-gray-400 text-xs">({record.st_seconds}초)</span></span></div>}
-            {record.video_url&&<div className="flex justify-between items-start py-1.5 border-b border-gray-50 gap-4"><span className="text-gray-400 flex-shrink-0">동영상</span><a href={record.video_url} target="_blank" rel="noopener noreferrer" className="text-red-500 font-medium flex items-center gap-1">▶ YouTube 열기 ↗</a></div>}
+            {record.video_url&&(()=>{
+              let vlist:{url:string;desc:string}[]=[]
+              try{ vlist=JSON.parse(record.video_url) }catch{ vlist=[{url:record.video_url,desc:''}] }
+              return(<div className="py-1.5 border-b border-gray-50">
+                <span className="text-gray-400 text-sm">동영상</span>
+                <div className="mt-1 space-y-1">
+                  {vlist.map((v,i)=>(
+                    <a key={i} href={v.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-2 py-1.5 bg-red-50 rounded-lg text-xs text-red-600 font-medium">
+                      <span>▶</span>
+                      <span>{v.desc||`영상 ${i+1}`}</span>
+                      <span className="ml-auto opacity-60">↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>)
+            })()}
             {record.memo&&<div className="flex justify-between items-start py-1.5 gap-4"><span className="text-gray-400 flex-shrink-0">메모</span><span className="text-gray-600 text-right">{record.memo}</span></div>}
           </div>
           {/* 사진 */}

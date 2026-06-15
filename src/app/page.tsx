@@ -164,7 +164,9 @@ function RecordForm() {
   const [inputQty,setInputQty]=useState(0); const [goodQty,setGoodQty]=useState(0); const [defectQty,setDefectQty]=useState(0)
   const [defects,setDefects]=useState<string[]>([]); const [materials,setMaterials]=useState<Material[]>([])
   const [selMats,setSelMats]=useState<string[]>([]); const [stSeconds,setStSeconds]=useState(0)
-  const [photos,setPhotos]=useState<string[]>([]); const [videoUrl,setVideoUrl]=useState(''); const [memo,setMemo]=useState('')
+  const [photos,setPhotos]=useState<string[]>([])
+  const [videos,setVideos]=useState<{url:string;desc:string}[]>([{url:'',desc:''}])
+  const [memo,setMemo]=useState('')
   const [submitting,setSubmitting]=useState(false); const [plansLoading,setPlansLoading]=useState(true)
   const [showCompleted,setShowCompleted]=useState(false)
   const [now,setNow]=useState(new Date())
@@ -211,7 +213,9 @@ function RecordForm() {
         item_name:selPlan.item_name, production_line:selPlan.production_line, shift:selPlan.shift,
         input_qty:mode!=='quick'?inputQty:null, good_qty:mode!=='quick'?goodQty:null,
         defect_qty:defectQty||null, defect_types:defects, defect_materials:selMats,
-        st_seconds:mode!=='quick'&&stSeconds>0?stSeconds:null, photo_urls:photos, video_url:videoUrl||null, memo:memo||null })})
+        st_seconds:mode!=='quick'&&stSeconds>0?stSeconds:null, photo_urls:photos,
+        video_url:videos.some(v=>v.url.trim())?JSON.stringify(videos.filter(v=>v.url.trim())):null,
+        memo:memo||null})})
     const data=await res.json()
     if(data.ok){
       const q=new URLSearchParams({ mode, item_code:selPlan.item_code, color_code:selPlan.color_code,
@@ -408,17 +412,40 @@ function RecordForm() {
         <PhotoUpload photos={photos} onPhotos={setPhotos} />
       </Section>
 
-      <Section title={mode==='quick'?'⑤ 작업 동영상 (선택)':'⑤ 작업 동영상 (선택)'}>
-        <p className="text-xs text-gray-400 mb-2">YouTube에 올린 뒤 링크를 붙여넣으세요</p>
-        <input type="url" value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}
-          placeholder="https://youtube.com/..."
-          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-700 bg-white" />
-        {videoUrl&&(
-          <a href={videoUrl} target="_blank" rel="noopener noreferrer"
-            className="mt-2 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl text-sm text-red-600 font-medium">
-            <span className="text-lg">▶</span> 링크 확인하기 ↗
-          </a>
-        )}
+      <Section title="⑤ 작업 동영상 (선택)">
+        <p className="text-xs text-gray-400 mb-3">YouTube 링크와 간단한 설명을 입력하세요 (여러 개 가능)</p>
+        <div className="space-y-3">
+          {videos.map((v,i)=>(
+            <div key={i} className="border-2 border-gray-200 rounded-xl p-3 space-y-2 bg-white">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 font-medium w-4">{i+1}</span>
+                <input type="url" value={v.url} onChange={e=>{const n=[...videos];n[i]={...n[i],url:e.target.value};setVideos(n)}}
+                  placeholder="https://youtube.com/..."
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-700" />
+                {videos.length>1&&(
+                  <button onClick={()=>setVideos(videos.filter((_,j)=>j!==i))}
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 text-lg flex-shrink-0">×</button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-4"/>
+                <input type="text" value={v.desc} onChange={e=>{const n=[...videos];n[i]={...n[i],desc:e.target.value};setVideos(n)}}
+                  placeholder="예) 조립 공정 ST 측정 / 불량 발생 현장"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-700" />
+              </div>
+              {v.url.trim()&&(
+                <a href={v.url} target="_blank" rel="noopener noreferrer"
+                  className="ml-6 flex items-center gap-1.5 text-xs text-red-500 font-medium">
+                  <span>▶</span> 링크 확인 ↗
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+        <button onClick={()=>setVideos([...videos,{url:'',desc:''}])}
+          className="mt-2 w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-700 transition-colors">
+          + 영상 추가
+        </button>
       </Section>
 
       <Section title={mode==='quick'?'⑥ 특이사항 (선택)':'⑥ 특이사항 (선택)'}>
