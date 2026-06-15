@@ -3,8 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 const NAV = [
-  { href:'/admin/dashboard', label:'생산 현황' },
-  { href:'/admin/records',   label:'기록 목록' },
+  { href:'/admin/dashboard', label:'생산 현황 / 기록' },
   { href:'/admin/import',    label:'데이터 가져오기' },
   { href:'/admin/materials', label:'자재코드' },
   { href:'/admin/plans',     label:'계획 관리' },
@@ -31,7 +30,7 @@ export default function AdminLayout({ children }: { children:React.ReactNode }) 
           target="_blank" rel="noopener noreferrer"
           className="text-xs text-green-400 hover:text-green-300 whitespace-nowrap flex-shrink-0">📊 데이터 시트 ↗</a>
       </header>
-      <main className="max-w-5xl mx-auto p-5">{children}</main>
+      <main className="w-full max-w-screen-2xl mx-auto px-6 py-5">{children}</main>
     </div>
   )
 }
