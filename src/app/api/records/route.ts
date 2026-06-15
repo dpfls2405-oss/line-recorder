@@ -33,3 +33,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([], { status: 500 })
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { id, ...fields } = await req.json()
+    if (!id) return NextResponse.json({ ok: false, error: 'id 필요' }, { status: 400 })
+
+    const allowed = ['production_line','item_code','color_code','item_name','input_qty','good_qty','defect_qty','defect_types','defect_materials','memo','video_url','st_seconds']
+    const update: Record<string, any> = {}
+    for (const k of allowed) { if (k in fields) update[k] = fields[k] }
+
+    if ('input_qty' in update && 'good_qty' in update) {
+      const inp = Number(update.input_qty) || 0
+      const good = Number(update.good_qty) || 0
+      update.defect_qty = inp - good
+      update.yield_pct = inp > 0 ? ((good / inp) * 100).toFixed(2) : null
+    }
+
+    const { error } = await supabase.from('line_records').update(update).eq('id', id)
+    if (error) throw error
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? '수정 실패' }, { status: 500 })
+  }
+}

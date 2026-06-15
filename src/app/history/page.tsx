@@ -9,7 +9,132 @@ function toLocalDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
+function EditModal({ record, onClose, onSaved }: { record:any; onClose:()=>void; onSaved:(updated:any)=>void }) {
+  const [form, setForm] = useState({
+    production_line: record.production_line??'',
+    item_code: record.item_code??'',
+    color_code: record.color_code??'',
+    item_name: record.item_name??'',
+    input_qty: record.input_qty??'',
+    good_qty: record.good_qty??'',
+    defect_types: record.defect_types??'',
+    defect_materials: record.defect_materials??'',
+    memo: record.memo??'',
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  function set(k: string, v: string) { setForm(f=>({...f,[k]:v})) }
+
+  async function save() {
+    setSaving(true); setErr('')
+    const body: any = { id: record.id, ...form }
+    if (form.input_qty!=='') body.input_qty = Number(form.input_qty)
+    if (form.good_qty!=='') body.good_qty = Number(form.good_qty)
+    const res = await fetch('/api/records', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    const json = await res.json()
+    setSaving(false)
+    if (!json.ok) { setErr(json.error??'저장 실패'); return }
+    const inp = Number(form.input_qty)||0; const good = Number(form.good_qty)||0
+    onSaved({ ...record, ...form,
+      input_qty: form.input_qty!==''?inp:record.input_qty,
+      good_qty: form.good_qty!==''?good:record.good_qty,
+      defect_qty: (form.input_qty!==''&&form.good_qty!=='') ? inp-good : record.defect_qty,
+      yield_pct: (inp>0) ? ((good/inp)*100).toFixed(2) : record.yield_pct,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{background:'rgba(0,0,0,0.75)'}}>
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-white rounded-t-3xl w-full max-w-lg overflow-y-auto" style={{maxHeight:'92vh'}}>
+        <div className="p-5">
+          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold">기록 수정</h2>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-lg">×</button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">생산라인</label>
+                <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                  value={form.production_line} onChange={e=>set('production_line',e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">품목코드</label>
+                <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600 font-mono"
+                  value={form.item_code} onChange={e=>set('item_code',e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">색상코드</label>
+                <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600 font-mono"
+                  value={form.color_code} onChange={e=>set('color_code',e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">부품명</label>
+                <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                  value={form.item_name} onChange={e=>set('item_name',e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">투입 수량</label>
+                <input type="number" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                  value={form.input_qty} onChange={e=>set('input_qty',e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">양품 수량</label>
+                <input type="number" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                  value={form.good_qty} onChange={e=>set('good_qty',e.target.value)} />
+              </div>
+            </div>
+            {(form.input_qty!==''&&form.good_qty!=='')&&(
+              <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-500 flex gap-4">
+                <span>불량 <b className="text-red-600">{Number(form.input_qty)-Number(form.good_qty)}</b></span>
+                <span>수율 <b className={Number(form.input_qty)>0?((Number(form.good_qty)/Number(form.input_qty)*100)>=95?'text-green-700':'text-amber-600'):'text-gray-400'}>
+                  {Number(form.input_qty)>0?((Number(form.good_qty)/Number(form.input_qty)*100).toFixed(1))+'%':'-'}
+                </b></span>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">불량유형</label>
+              <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                value={form.defect_types} onChange={e=>set('defect_types',e.target.value)} placeholder="예: 재봉불량, 오염" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">불량자재</label>
+              <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600"
+                value={form.defect_materials} onChange={e=>set('defect_materials',e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">메모</label>
+              <textarea className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-600 resize-none"
+                rows={2} value={form.memo} onChange={e=>set('memo',e.target.value)} />
+            </div>
+          </div>
+
+          {err&&<p className="text-xs text-red-500 mt-3 text-center">{err}</p>}
+
+          <div className="flex gap-2 mt-5">
+            <button onClick={onClose} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 text-sm font-medium">취소</button>
+            <button onClick={save} disabled={saving}
+              className="flex-1 py-3 rounded-2xl bg-green-700 text-white text-sm font-semibold disabled:opacity-50">
+              {saving?'저장 중...':'저장'}
+            </button>
+          </div>
+          <div className="pb-4" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PhotoModal({ record, onClose, onEdit }: { record:any; onClose:()=>void; onEdit:()=>void }) {
   const photos = record.photo_urls
     ? record.photo_urls.split(',').map((u:string)=>u.trim()).filter(Boolean) : []
   return (
@@ -18,7 +143,6 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
       <div className="relative bg-white rounded-t-3xl w-full max-w-lg overflow-y-auto" style={{maxHeight:'90vh'}}>
         <div className="p-5">
           <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-          {/* 헤더 */}
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -29,9 +153,12 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
               {record.item_name&&<p className="text-xs text-gray-400 mt-0.5">{record.item_name}</p>}
               <p className="text-xs text-gray-300 mt-0.5">{new Date(record.recorded_at).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-lg flex-shrink-0">×</button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={onEdit}
+                className="px-3 py-1.5 rounded-xl bg-green-700 text-white text-xs font-medium">수정</button>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-lg">×</button>
+            </div>
           </div>
-          {/* 수치 */}
           {(record.input_qty!=null||record.good_qty!=null||record.defect_qty!=null)&&(
             <div className="grid grid-cols-3 gap-2 mb-4">
               {record.input_qty!=null&&<div className="bg-gray-50 rounded-xl p-3 text-center"><div className="text-2xl font-medium">{record.input_qty}</div><div className="text-xs text-gray-400 mt-0.5">투입</div></div>}
@@ -39,7 +166,6 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
               {record.defect_qty!=null&&<div className={`rounded-xl p-3 text-center ${record.defect_qty>0?'bg-red-50':'bg-gray-50'}`}><div className={`text-2xl font-medium ${record.defect_qty>0?'text-red-600':'text-gray-500'}`}>{record.defect_qty}</div><div className="text-xs text-gray-400 mt-0.5">불량</div></div>}
             </div>
           )}
-          {/* 상세 */}
           <div className="space-y-2 mb-4 text-sm">
             {record.yield_pct!=null&&<div className="flex justify-between py-1.5 border-b border-gray-50"><span className="text-gray-400">수율</span><span className={`font-bold ${parseFloat(record.yield_pct)>=95?'text-green-700':parseFloat(record.yield_pct)>=85?'text-amber-600':'text-red-600'}`}>{parseFloat(record.yield_pct).toFixed(1)}%</span></div>}
             {record.defect_types&&<div className="flex justify-between py-1.5 border-b border-gray-50"><span className="text-gray-400">불량유형</span><span className="text-red-600 font-medium">{record.defect_types}</span></div>}
@@ -54,9 +180,7 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
                   {vlist.map((v,i)=>(
                     <a key={i} href={v.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 px-2 py-1.5 bg-red-50 rounded-lg text-xs text-red-600 font-medium">
-                      <span>▶</span>
-                      <span>{v.desc||`영상 ${i+1}`}</span>
-                      <span className="ml-auto opacity-60">↗</span>
+                      <span>▶</span><span>{v.desc||`영상 ${i+1}`}</span><span className="ml-auto opacity-60">↗</span>
                     </a>
                   ))}
                 </div>
@@ -64,7 +188,6 @@ function PhotoModal({ record, onClose }: { record:any; onClose:()=>void }) {
             })()}
             {record.memo&&<div className="flex justify-between items-start py-1.5 gap-4"><span className="text-gray-400 flex-shrink-0">메모</span><span className="text-gray-600 text-right">{record.memo}</span></div>}
           </div>
-          {/* 사진 */}
           {photos.length>0?(
             <div>
               <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">불량 사진 {photos.length}장</p>
@@ -96,6 +219,7 @@ export default function HistoryPage() {
   const [loading,setLoading]=useState(true)
   const [filter,setFilter]=useState('today')
   const [selRecord,setSelRecord]=useState<any>(null)
+  const [editRecord,setEditRecord]=useState<any>(null)
   const today = toLocalDateStr(new Date())
   const [dateFrom,setDateFrom]=useState(today)
   const [dateTo,setDateTo]=useState(today)
@@ -111,6 +235,11 @@ export default function HistoryPage() {
     const res=await fetch(`/api/records?${params.toString()}`)
     const data=res.ok?await res.json():[]
     setRecords(data); setLoading(false)
+  }
+
+  function handleSaved(updated: any) {
+    setRecords(rs => rs.map(r => r.id===updated.id ? updated : r))
+    setSelRecord(updated)
   }
 
   const allLines = Array.from(new Set(records.map(r=>r.production_line||'미지정'))).sort()
@@ -131,7 +260,6 @@ export default function HistoryPage() {
           <button onClick={()=>router.push('/')} className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-white">←</button>
           <div><h1 className="text-base font-medium">기록 현황</h1><p className="text-xs text-green-200">{filtered.length}건</p></div>
         </div>
-        {/* 기간 필터 */}
         <div className="flex gap-2 mb-2 flex-wrap">
           {[['today','오늘'],['week','7일'],['all','전체']].map(([k,l])=>(
             <button key={k} onClick={()=>{ setFilter(k); setShowDatePicker(false) }}
@@ -142,7 +270,6 @@ export default function HistoryPage() {
             {filter==='custom'?`${dateFrom} ~ ${dateTo}`:'📅 날짜 선택'}
           </button>
         </div>
-        {/* 날짜 피커 */}
         {showDatePicker&&(
           <div className="bg-white rounded-2xl p-3 mb-2 text-gray-800">
             <div className="flex items-center gap-2">
@@ -162,7 +289,6 @@ export default function HistoryPage() {
               className="w-full mt-2 py-2 bg-green-700 text-white rounded-xl text-sm font-medium">조회</button>
           </div>
         )}
-        {/* 생산라인 필터 */}
         {allLines.length>1&&(
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
             <button onClick={()=>setLineFilter('all')}
@@ -246,7 +372,13 @@ export default function HistoryPage() {
           })}
         </div>
       )}
-      {selRecord&&<PhotoModal record={selRecord} onClose={()=>setSelRecord(null)} />}
+
+      {selRecord&&!editRecord&&(
+        <PhotoModal record={selRecord} onClose={()=>setSelRecord(null)} onEdit={()=>setEditRecord(selRecord)} />
+      )}
+      {editRecord&&(
+        <EditModal record={editRecord} onClose={()=>setEditRecord(null)} onSaved={handleSaved} />
+      )}
     </div>
   )
 }
