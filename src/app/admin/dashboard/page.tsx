@@ -69,7 +69,7 @@ export default function AdminDashboard() {
             <option value="ALL">전체</option>{allItems.map(p=><option key={p}>{p}</option>)}</select></div>
         {tab==='stats'&&(
           <div className="flex gap-2 ml-auto">
-            {(['item','품목별'],['line','라인별'],['date','날짜별']) && [['item','품목별'],['line','라인별'],['date','날짜별']].map(([k,l])=>(
+            {[['item','품목별'],['line','라인별'],['date','날짜별']].map(([k,l])=>(
               <button key={k} onClick={()=>setGroupBy(k as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${groupBy===k?'bg-gray-900 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
             ))}
