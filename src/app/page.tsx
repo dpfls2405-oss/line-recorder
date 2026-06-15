@@ -263,8 +263,8 @@ function RecordForm() {
           <div className="flex gap-1.5 mb-2 flex-wrap">
             <button onClick={()=>{setDateFrom(todayStr);setDateTo(todayStr)}}
               className={`px-3 py-1 rounded-full text-xs font-medium border ${dateFrom===todayStr&&dateTo===todayStr?'bg-green-700 text-white border-green-700':'bg-white text-gray-600 border-gray-200'}`}>오늘</button>
-            <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-6);setDateFrom(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);setDateTo(todayStr)}}
-              className="px-3 py-1 rounded-full text-xs font-medium border bg-white text-gray-600 border-gray-200">최근 7일</button>
+            <button onClick={()=>{const d=new Date();d.setDate(d.getDate()+6);const s=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;setDateFrom(todayStr);setDateTo(s)}}
+              className="px-3 py-1 rounded-full text-xs font-medium border bg-white text-gray-600 border-gray-200">앞으로 7일</button>
             <button onClick={()=>{setDateFrom('');setDateTo('')}}
               className={`px-3 py-1 rounded-full text-xs font-medium border ${!dateFrom&&!dateTo?'bg-green-700 text-white border-green-700':'bg-white text-gray-600 border-gray-200'}`}>전체</button>
           </div>
