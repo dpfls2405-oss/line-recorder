@@ -26,6 +26,12 @@ export async function POST(req: NextRequest) {
     ? '📋 *로트 마감 기록이 등록되었습니다*'
     : '⚡ *빠른 불량 기록이 등록되었습니다*'
 
+  // ST(초) → "X분 Y초" 포맷
+  const stSeconds = record.st_seconds
+  const stText = (stSeconds != null && stSeconds > 0)
+    ? `${Math.floor(stSeconds / 60)}분 ${Math.round(stSeconds % 60)}초 (${stSeconds}초)`
+    : null
+
   const blocks: object[] = [
     {
       type: 'section',
@@ -42,7 +48,11 @@ export async function POST(req: NextRequest) {
           { type: 'mrkdwn', text: `*수율*\n${record.yield_pct ? record.yield_pct + '%' : '-'}` },
         ] : [
           { type: 'mrkdwn', text: `*불량수량*\n${record.defect_qty ?? 0}` },
-        ])
+        ]),
+        // ST: 값이 있을 때만 추가
+        ...(stText ? [
+          { type: 'mrkdwn', text: `*ST(표준시간)*\n${stText}` },
+        ] : []),
       ]
     }
   ]
@@ -55,6 +65,35 @@ export async function POST(req: NextRequest) {
         type: 'mrkdwn',
         text: `*불량 유형*\n${record.defect_types || '없음'}`
       }
+    })
+  }
+
+  // 메모: 값이 있을 때만 추가
+  if (record.memo && String(record.memo).trim()) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*📝 메모*\n${record.memo}` }
+    })
+  }
+
+  // 동영상 링크: 값이 있을 때만 추가 (JSON 배열 또는 단일 URL 모두 처리)
+  let videos: { url: string; desc: string }[] = []
+  const rawVideo = record.video_url
+  if (typeof rawVideo === 'string' && rawVideo.trim()) {
+    if (rawVideo.trim().startsWith('[')) {
+      try { videos = JSON.parse(rawVideo) } catch { videos = [] }
+    } else {
+      videos = [{ url: rawVideo.trim(), desc: '' }]
+    }
+  }
+  videos = videos.filter(v => v.url && v.url.trim())
+  if (videos.length > 0) {
+    const links = videos
+      .map((v, i) => `▶ <${v.url}|${v.desc || `영상 ${i + 1}`}>`)
+      .join('\n')
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*🎬 작업 동영상*\n${links}` }
     })
   }
 
