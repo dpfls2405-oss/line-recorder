@@ -254,7 +254,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="pb-8 min-h-screen bg-gray-100">
+    <div className="pb-8 min-h-screen bg-gray-100 max-w-md mx-auto">
       <div className="bg-green-800 text-white px-4 pt-4 pb-4 sticky top-0 z-10">
         <div className="flex items-center gap-3 mb-3">
           <button onClick={()=>router.push('/')} className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-white">←</button>

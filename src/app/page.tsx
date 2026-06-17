@@ -228,7 +228,7 @@ function RecordForm() {
   }
 
   return (
-    <div className="pb-8">
+    <div className="pb-8 max-w-md mx-auto bg-gray-100 min-h-screen">
       <div className="bg-green-800 text-white px-4 pt-4 pb-5">
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-3">
