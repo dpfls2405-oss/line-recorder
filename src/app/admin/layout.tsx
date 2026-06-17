@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 const NAV = [
   { href:'/admin/dashboard', label:'생산 현황' },
   { href:'/admin/records',   label:'기록 목록' },
+  { href:'/admin/videos',    label:'영상 모음' },
   { href:'/admin/import',    label:'데이터 가져오기' },
   { href:'/admin/materials', label:'자재코드' },
   { href:'/admin/plans',     label:'계획 관리' },
@@ -15,12 +16,12 @@ export default function AdminLayout({ children }: { children:React.ReactNode }) 
   if(pathname==='/admin') return <>{children}</>
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-gray-900 text-white h-12 flex items-center px-4 gap-4">
-        <span className="text-sm font-medium text-gray-200 flex-shrink-0">관리자</span>
-        <nav className="flex gap-1 flex-1 overflow-x-auto">
+      <header className="bg-gray-900 text-white min-h-12 flex items-center px-6 gap-4 flex-wrap py-1.5">
+        <span className="text-sm font-semibold text-gray-100 flex-shrink-0">관리자</span>
+        <nav className="flex gap-1 flex-1 flex-wrap">
           {NAV.map(n=>(
             <Link key={n.href} href={n.href}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${pathname===n.href?'bg-white/20 text-white':'text-gray-400 hover:text-white hover:bg-white/10'}`}>
+              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${pathname===n.href?'bg-white/20 text-white':'text-gray-400 hover:text-white hover:bg-white/10'}`}>
               {n.label}
             </Link>
           ))}
