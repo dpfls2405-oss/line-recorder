@@ -187,13 +187,24 @@ function RecordForm() {
     if(lineParam) params.set('line',lineParam)
     const res=await fetch(`/api/plans?${params.toString()}`)
     const p=res.ok?await res.json():[]
-    setPlans(p); if(p.length>0){ setSelPlan(p[0]); setInputQty(p[0].plan_qty||0); setGoodQty(p[0].plan_qty||0) }
+    setPlans(p)
     setPlansLoading(false)
   }
 
   const allLines = Array.from(new Set(plans.map(p=>p.production_line).filter(Boolean))).sort()
   const visiblePlans = plans.filter(p=> p.status!=='completed' && (filterLine===''||p.production_line===filterLine))
   const completedPlans = plans.filter(p=> p.status==='completed' && (filterLine===''||p.production_line===filterLine))
+
+  // selPlan은 항상 "현재 화면에 보이는 계획" 중 하나여야 한다.
+  // (목록 재조회·라인 필터 변경 시 숨겨진/삭제된 계획이 선택된 채로 남아 오기록되는 것 방지)
+  useEffect(()=>{
+    const vis = plans.filter(p=> p.status!=='completed' && (filterLine===''||p.production_line===filterLine))
+    if(!selPlan || !vis.some(p=>p.id===selPlan.id)){
+      const first = vis[0] ?? null
+      setSelPlan(first)
+      if(first){ setInputQty(first.plan_qty||0); setGoodQty(first.plan_qty||0) }
+    }
+  },[plans,filterLine])
   async function loadBom(itemCode:string,colorCode:string) {
     const res=await fetch(`/api/bom?item_code=${encodeURIComponent(itemCode)}&color_code=${encodeURIComponent(colorCode)}`)
     const data=res.ok?await res.json():[]
@@ -207,6 +218,10 @@ function RecordForm() {
 
   async function handleSubmit() {
     if(!selPlan){ alert('제품을 선택해주세요'); return }
+    // 선택된 계획이 현재 화면 목록에 없으면(숨김/삭제/필터 불일치) 오기록 방지
+    if(!visiblePlans.some(p=>p.id===selPlan.id)){
+      alert('선택한 계획이 현재 목록에 없습니다. 제품을 다시 선택해주세요.'); return
+    }
     setSubmitting(true)
     const res=await fetch('/api/record',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ mode, plan_id:selPlan.id, item_code:selPlan.item_code, color_code:selPlan.color_code,
