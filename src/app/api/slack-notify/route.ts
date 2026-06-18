@@ -97,36 +97,53 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // 사진 추가
-  if (firstPhoto) {
+  // 사진: 항상 텍스트 링크로 먼저 넣어둔다 (이미지 미리보기가 실패해도 링크는 남도록)
+  if (photoUrls.length > 0) {
+    const links = photoUrls
+      .map((url: string, i: number) => `<${url}|사진 ${i + 1}>`)
+      .join('   ')
     blocks.push({
-      type: 'image',
-      image_url: firstPhoto,
-      alt_text: '불량 현장 사진'
+      type: 'section',
+      text: { type: 'mrkdwn', text: `📎 *사진 ${photoUrls.length}장*\n${links}` }
     })
-
-    if (photoUrls.length > 1) {
-      const links = photoUrls
-        .slice(1)
-        .map((url: string, i: number) => `<${url}|사진 ${i + 2}>`)
-        .join('  ')
-      blocks.push({
-        type: 'section',
-        text: { type: 'mrkdwn', text: `📎 추가 사진: ${links}` }
-      })
-    }
   }
 
-  const message = {
-    text: mode === 'lot' ? '📋 로트 마감 기록 등록' : '⚡ 빠른 불량 기록 등록',
-    blocks
+  // 이미지 미리보기 블록은 별도로 — Slack이 거부하면 이 블록만 빼고 재전송
+  const imageBlock = firstPhoto
+    ? { type: 'image', image_url: firstPhoto, alt_text: '불량 현장 사진' }
+    : null
+
+  const fallbackText = mode === 'lot' ? '📋 로트 마감 기록 등록' : '⚡ 빠른 불량 기록 등록'
+  const webhook = process.env.SLACK_WEBHOOK_URL
+
+  if (!webhook) {
+    return NextResponse.json({ ok: false, error: 'SLACK_WEBHOOK_URL 미설정' }, { status: 500 })
   }
 
-  await fetch(process.env.SLACK_WEBHOOK_URL!, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(message)
-  })
+  async function postToSlack(blocksToSend: object[]) {
+    const res = await fetch(webhook!, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: fallbackText, blocks: blocksToSend }),
+    })
+    const detail = await res.text().catch(() => '')
+    return { ok: res.ok, status: res.status, detail }
+  }
+
+  // 1차: 이미지 미리보기 포함 시도
+  let result = await postToSlack(imageBlock ? [...blocks, imageBlock] : blocks)
+
+  // 2차: 이미지 블록 때문에 거부되면(보통 invalid_blocks) 이미지 빼고 재전송 → 알림 누락 방지
+  if (!result.ok && imageBlock) {
+    result = await postToSlack(blocks)
+  }
+
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, error: `Slack 전송 실패 (${result.status})`, detail: result.detail },
+      { status: 502 }
+    )
+  }
 
   return NextResponse.json({ ok: true })
 }
