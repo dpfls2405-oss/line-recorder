@@ -9,16 +9,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ skipped: true })
   }
 
-  // photo_urls가 문자열/배열 어떤 형태든 안전하게 파싱
+  // photo_urls 파싱 — DB에는 콤마(,)로 합쳐진 문자열로 저장됨
+  // 배열 / JSON 배열 문자열 / 콤마 구분 문자열 모두 안전하게 처리
   let photoUrls: string[] = []
   const raw = record.photo_urls
   if (Array.isArray(raw)) {
     photoUrls = raw
-  } else if (typeof raw === 'string' && raw.startsWith('[')) {
+  } else if (typeof raw === 'string' && raw.trim().startsWith('[')) {
     try { photoUrls = JSON.parse(raw) } catch { photoUrls = [] }
-  } else if (typeof raw === 'string' && raw.length > 0) {
-    photoUrls = [raw]
+  } else if (typeof raw === 'string' && raw.trim().length > 0) {
+    photoUrls = raw.split(',')   // ← 콤마로 분리 (사진 2장 이상 처리)
   }
+  photoUrls = photoUrls.map((u: string) => String(u).trim()).filter(Boolean)
   const firstPhoto = photoUrls[0] || null
 
   // 모드별 헤더
