@@ -13,7 +13,7 @@ function fmtTime(iso:string){
   return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
 }
 
-function EditModal({ record, onClose, onSaved }: { record:any; onClose:()=>void; onSaved:(u:any)=>void }) {
+function EditModal({ record, onClose, onSaved, onDeleted }: { record:any; onClose:()=>void; onSaved:(u:any)=>void; onDeleted:(id:string)=>void }) {
   const [f, setF] = useState({
     production_line: record.production_line??'',
     item_code:       record.item_code??'',
@@ -26,8 +26,18 @@ function EditModal({ record, onClose, onSaved }: { record:any; onClose:()=>void;
     memo:            record.memo??'',
   })
   const [saving,setSaving]=useState(false)
+  const [deleting,setDeleting]=useState(false)
   const [err,setErr]=useState('')
   const set=(k:string,v:string)=>setF(p=>({...p,[k]:v}))
+
+  async function del(){
+    if(!confirm('이 기록을 삭제하시겠습니까?\n삭제 후 되돌릴 수 없습니다.')) return
+    setDeleting(true); setErr('')
+    const res=await fetch(`/api/records?id=${record.id}`,{method:'DELETE'})
+    const j=await res.json(); setDeleting(false)
+    if(!j.ok){setErr(j.error??'삭제 실패');return}
+    onDeleted(record.id)
+  }
 
   async function save(){
     setSaving(true); setErr('')
@@ -102,8 +112,12 @@ function EditModal({ record, onClose, onSaved }: { record:any; onClose:()=>void;
           </div>
           {err&&<p className="text-xs text-red-500 mt-2 text-center">{err}</p>}
           <div className="flex gap-3 mt-5">
+            <button onClick={del} disabled={deleting||saving}
+              className="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 disabled:opacity-50">
+              {deleting?'삭제 중…':'삭제'}
+            </button>
             <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium">취소</button>
-            <button onClick={save} disabled={saving}
+            <button onClick={save} disabled={saving||deleting}
               className="flex-1 py-2.5 rounded-xl bg-green-700 text-white text-sm font-semibold disabled:opacity-50">
               {saving?'저장 중…':'저장'}
             </button>
@@ -325,7 +339,9 @@ export default function RecordsPage() {
       </div>
 
       {editRec&&(
-        <EditModal record={editRec} onClose={()=>setEditRec(null)} onSaved={r=>{ handleSaved(r); setEditRec(null) }}/>
+        <EditModal record={editRec} onClose={()=>setEditRec(null)}
+          onSaved={r=>{ handleSaved(r); setEditRec(null) }}
+          onDeleted={id=>{ setRecords(rs=>rs.filter(r=>r.id!==id)); setEditRec(null) }}/>
       )}
     </div>
   )

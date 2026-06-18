@@ -57,3 +57,17 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message ?? '수정 실패' }, { status: 500 })
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ ok: false, error: 'id 필요' }, { status: 400 })
+
+    const { error } = await supabase.from('line_records').delete().eq('id', id)
+    if (error) throw error
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? '삭제 실패' }, { status: 500 })
+  }
+}
