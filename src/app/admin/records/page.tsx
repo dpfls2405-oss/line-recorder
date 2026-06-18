@@ -157,6 +157,38 @@ export default function RecordsPage() {
     setRecords(rs=>rs.map(r=>r.id===u.id?u:r))
   }
 
+  function exportCsv(){
+    if(records.length===0) return
+    const headers = ['시각','모드','라인','품목코드','색상','부품명','투입','양품','불량','수율(%)','ST(초)','불량유형','불량자재','메모','사진URL','동영상']
+    const modeLabel: Record<string,string> = { quick:'불량기록', lot:'로트마감' }
+    const esc = (v:any) => {
+      const s = v==null ? '' : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s
+    }
+    const rows = records.map(r=>{
+      let videos:{url:string;desc:string}[]=[]
+      if(r.video_url){ try{ videos=JSON.parse(r.video_url) }catch{ videos=[{url:r.video_url,desc:''}] } }
+      const videoStr = videos.filter(v=>v.url).map(v=>`${v.desc||'영상'}: ${v.url}`).join(' | ')
+      const t = new Date(r.recorded_at)
+      const timeStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`
+      return [
+        timeStr, modeLabel[r.mode]??r.mode, r.production_line, r.item_code, r.color_code, r.item_name,
+        r.input_qty, r.good_qty, r.defect_qty,
+        r.yield_pct!=null?parseFloat(r.yield_pct).toFixed(1):'',
+        r.st_seconds, r.defect_types, r.defect_materials, r.memo,
+        r.photo_urls, videoStr,
+      ].map(esc).join(',')
+    })
+    const csv = '﻿' + [headers.join(','), ...rows].join('\r\n')  // BOM → 엑셀 한글 깨짐 방지
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `생산기록_${dateFrom}_${dateTo}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const allLines=Array.from(new Set(records.map(r=>r.production_line).filter(Boolean))).sort()
   const allItems=Array.from(new Set(records.map(r=>r.item_code).filter(Boolean))).sort()
 
@@ -194,6 +226,10 @@ export default function RecordsPage() {
           <input type="checkbox" checked={filterPhoto} onChange={e=>setFilterPhoto(e.target.checked)} className="w-4 h-4 rounded accent-green-700"/>
           <span className="text-sm text-gray-600">사진 있는 기록만</span>
         </label>
+        <button onClick={exportCsv} disabled={records.length===0}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed">
+          ⬇ 엑셀 다운로드
+        </button>
       </div>
 
       {/* 기록 테이블 */}
