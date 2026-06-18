@@ -9,6 +9,7 @@ export default function AdminPlans() {
   const [filterStatus, setFilterStatus] = useState<'all'|'active'|'completed'>('active')
   const [onlyOver100, setOnlyOver100] = useState(false)
   const [sortBy, setSortBy] = useState<'date'|'pct'>('date')
+  const [q, setQ] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -43,9 +44,11 @@ export default function AdminPlans() {
 
   const pctOf = (p:any) => p.plan_qty > 0 ? (totals[p.id] ?? 0) / p.plan_qty * 100 : 0
 
+  const kw = q.trim().toLowerCase()
   let filtered = plans.filter(p =>
     (filterStatus === 'all' ? true : p.status === filterStatus) &&
-    (!onlyOver100 || pctOf(p) >= 100)
+    (!onlyOver100 || pctOf(p) >= 100) &&
+    (kw === '' || `${p.item_name ?? ''} ${p.item_code ?? ''} ${p.color_code ?? ''}`.toLowerCase().includes(kw))
   )
 
   if (sortBy === 'pct') {
@@ -97,7 +100,15 @@ export default function AdminPlans() {
           ))}
         </div>
 
-        <span className="ml-auto text-sm text-gray-400">{filtered.length}건</span>
+        <div className="h-6 w-px bg-gray-200" />
+
+        <div className="flex-1 min-w-[200px]">
+          <input value={q} onChange={e=>setQ(e.target.value)}
+            placeholder="부품명 · 품목코드 검색…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-green-700" />
+        </div>
+
+        <span className="text-sm text-gray-400">{filtered.length}건</span>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
