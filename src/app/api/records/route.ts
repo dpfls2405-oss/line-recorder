@@ -36,14 +36,24 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, ...fields } = await req.json()
+    const { id, notify, ...fields } = await req.json()
     if (!id) return NextResponse.json({ ok: false, error: 'id 필요' }, { status: 400 })
 
     const allowed = ['production_line','item_code','color_code','item_name','input_qty','good_qty','defect_qty','defect_types','defect_materials','memo','video_url','st_seconds']
+    const numeric = new Set(['input_qty','good_qty','defect_qty','st_seconds'])
     const update: Record<string, any> = {}
-    for (const k of allowed) { if (k in fields) update[k] = fields[k] }
+    for (const k of allowed) {
+      if (!(k in fields)) continue
+      let v = fields[k]
+      // 숫자 컬럼: 빈 문자열/undefined → null, 그 외 숫자로 변환 (integer 에러 방지)
+      if (numeric.has(k)) {
+        v = (v === '' || v === null || v === undefined) ? null : Number(v)
+        if (v !== null && Number.isNaN(v)) v = null
+      }
+      update[k] = v
+    }
 
-    if ('input_qty' in update && 'good_qty' in update) {
+    if ('input_qty' in update && 'good_qty' in update && update.input_qty !== null && update.good_qty !== null) {
       const inp = Number(update.input_qty) || 0
       const good = Number(update.good_qty) || 0
       update.defect_qty = inp - good
@@ -52,6 +62,22 @@ export async function PATCH(req: NextRequest) {
 
     const { error } = await supabase.from('line_records').update(update).eq('id', id)
     if (error) throw error
+
+    // 수정 후 슬랙 재알림 (notify=true 일 때만)
+    if (notify) {
+      try {
+        const { data: full } = await supabase.from('line_records').select('*').eq('id', id).single()
+        if (full) {
+          const origin = new URL(req.url).origin
+          await fetch(`${origin}/api/slack-notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ record: full, edited: true }),
+          })
+        }
+      } catch { /* 알림 실패는 수정 성공에 영향 주지 않음 */ }
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? '수정 실패' }, { status: 500 })

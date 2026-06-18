@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const record = body.record
+  const edited = body.edited === true
 
   const mode = record?.mode
   if (mode !== 'lot' && mode !== 'quick') {
@@ -24,9 +25,10 @@ export async function POST(req: NextRequest) {
   const firstPhoto = photoUrls[0] || null
 
   // 모드별 헤더
+  const suffix = edited ? '수정되었습니다 ✏️' : '등록되었습니다'
   const header = mode === 'lot'
-    ? '📋 *로트 마감 기록이 등록되었습니다*'
-    : '⚡ *빠른 불량 기록이 등록되었습니다*'
+    ? `📋 *로트 마감 기록이 ${suffix}*`
+    : `⚡ *빠른 불량 기록이 ${suffix}*`
 
   // ST(초) → "X분 Y초" 포맷
   const stSeconds = record.st_seconds

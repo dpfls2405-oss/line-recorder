@@ -41,9 +41,7 @@ function EditModal({ record, onClose, onSaved, onDeleted }: { record:any; onClos
 
   async function save(){
     setSaving(true); setErr('')
-    const body:any={id:record.id,...f}
-    if(f.input_qty!=='') body.input_qty=Number(f.input_qty)
-    if(f.good_qty!=='')  body.good_qty=Number(f.good_qty)
+    const body:any={id:record.id,...f,notify:true}
     const res=await fetch('/api/records',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     const j=await res.json(); setSaving(false)
     if(!j.ok){setErr(j.error??'저장 실패');return}
