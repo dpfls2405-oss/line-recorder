@@ -39,8 +39,9 @@ export async function PATCH(req: NextRequest) {
     const { id, notify, ...fields } = await req.json()
     if (!id) return NextResponse.json({ ok: false, error: 'id 필요' }, { status: 400 })
 
-    const allowed = ['production_line','item_code','color_code','item_name','input_qty','good_qty','defect_qty','defect_types','defect_materials','memo','video_url','st_seconds']
+    const allowed = ['production_line','item_code','color_code','item_name','input_qty','good_qty','defect_qty','defect_types','defect_materials','memo','video_url','st_seconds','review_status','improve_due','review_comment']
     const numeric = new Set(['input_qty','good_qty','defect_qty','st_seconds'])
+    const nullableEmpty = new Set(['improve_due'])  // date 등: 빈 문자열 → null
     const update: Record<string, any> = {}
     for (const k of allowed) {
       if (!(k in fields)) continue
@@ -49,6 +50,8 @@ export async function PATCH(req: NextRequest) {
       if (numeric.has(k)) {
         v = (v === '' || v === null || v === undefined) ? null : Number(v)
         if (v !== null && Number.isNaN(v)) v = null
+      } else if (nullableEmpty.has(k)) {
+        v = (v === '' || v === null || v === undefined) ? null : v
       }
       update[k] = v
     }

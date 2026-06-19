@@ -6,6 +6,7 @@ const NAV = [
   { href:'/admin/dashboard', label:'생산 현황' },
   { href:'/admin/records',   label:'기록 목록' },
   { href:'/admin/videos',    label:'영상 모음' },
+  { href:'/admin/defects',   label:'불량 관리' },
   { href:'/admin/import',    label:'데이터 가져오기' },
   { href:'/admin/materials', label:'자재코드' },
   { href:'/admin/plans',     label:'계획 관리' },
