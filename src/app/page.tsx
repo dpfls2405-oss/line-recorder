@@ -114,6 +114,24 @@ function Stopwatch({ onApply }: { onApply:(sec:number)=>void }) {
   )
 }
 
+// 업로드 전 브라우저에서 리사이즈+JPEG 압축 (긴 변 1600px, 품질 0.7)
+async function compressImage(file: File, maxDim=1600, quality=0.7): Promise<Blob> {
+  if(!file.type.startsWith('image/')) return file
+  const bitmap = await createImageBitmap(file).catch(()=>null)
+  if(!bitmap) return file
+  let { width, height } = bitmap
+  if(width>maxDim || height>maxDim){
+    const scale = maxDim/Math.max(width,height)
+    width=Math.round(width*scale); height=Math.round(height*scale)
+  }
+  const canvas=document.createElement('canvas'); canvas.width=width; canvas.height=height
+  const ctx=canvas.getContext('2d'); if(!ctx) return file
+  ctx.drawImage(bitmap,0,0,width,height); bitmap.close?.()
+  const blob: Blob|null = await new Promise(res=>canvas.toBlob(res,'image/jpeg',quality))
+  // 압축 결과가 원본보다 크면 원본 사용 (이미 작은 파일 보호)
+  return (blob && blob.size < file.size) ? blob : file
+}
+
 function PhotoUpload({ photos, onPhotos }: { photos:string[]; onPhotos:(p:string[])=>void }) {
   const fileRef=useRef<HTMLInputElement>(null); const slotRef=useRef(0); const MAX=5
   const [uploading,setUploading]=useState(false)
@@ -121,9 +139,9 @@ function PhotoUpload({ photos, onPhotos }: { photos:string[]; onPhotos:(p:string
     const file=e.target.files?.[0]; if(!file)return
     setUploading(true)
     try {
-      const ext=file.name.split('.').pop()||'jpg'
-      const path=`${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error }=await supabase.storage.from('line-photos').upload(path,file,{cacheControl:'3600',upsert:false})
+      const blob=await compressImage(file)
+      const path=`${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`
+      const { error }=await supabase.storage.from('line-photos').upload(path,blob,{cacheControl:'3600',upsert:false,contentType:'image/jpeg'})
       if(error) throw error
       const { data:urlData }=supabase.storage.from('line-photos').getPublicUrl(path)
       const url=urlData.publicUrl
