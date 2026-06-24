@@ -1,102 +1,130 @@
-// 기존 업로드된 사진 일괄 압축 스크립트 (일회성)
-// - Supabase Storage(line-photos)의 모든 이미지를 다운로드 → 리사이즈+JPEG 압축 → 같은 경로에 덮어쓰기
-// - 같은 경로로 덮어쓰므로 DB(photo_urls)의 URL은 그대로 유효
+// 모든 프로젝트의 Storage 이미지 일괄 압축 스크립트 (일회성)
+// - 여러 Supabase 프로젝트 × 모든 버킷 × 모든 폴더(재귀)를 순회
+// - 각 이미지를 다운로드 → 리사이즈+JPEG 압축 → 같은 경로에 덮어쓰기 (URL 유지)
 //
-// 실행 전 환경변수 설정 (키는 채팅에 붙여넣지 말고 터미널에서만):
-//   PowerShell:
-//     $env:SUPABASE_URL="https://xxxx.supabase.co"
-//     $env:SUPABASE_SERVICE_KEY="<service_role 키>"
-//   실행:
-//     node scripts/compress-existing.mjs
+// ── 사용법 ────────────────────────────────────────────────
+// 1) 패키지 설치 (일회성):   npm i sharp
+// 2) 프로젝트 목록 작성:      scripts/projects.local.json  (아래 예시, 깃에 안 올라감)
+//      [
+//        { "name": "line-recorder", "url": "https://xxxx.supabase.co", "serviceKey": "eyJ..." },
+//        { "name": "가공일지",       "url": "https://yyyy.supabase.co", "serviceKey": "eyJ..." }
+//      ]
+//    (또는 단일 프로젝트만 할 경우 환경변수 SUPABASE_URL / SUPABASE_SERVICE_KEY 로도 가능)
+// 3) 실행:                    node scripts/compress-existing.mjs
 //
-// 필요 패키지: @supabase/supabase-js (설치됨), sharp (npm i sharp 필요)
+// ⚠️ serviceKey 는 전체 권한 비밀키입니다. projects.local.json 은 절대 깃/외부에 공유하지 마세요.
+// ────────────────────────────────────────────────────────────
 
 import { createClient } from '@supabase/supabase-js'
+import { readFileSync, existsSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import sharp from 'sharp'
 
-const URL = process.env.SUPABASE_URL
-const KEY = process.env.SUPABASE_SERVICE_KEY
-const BUCKET = 'line-photos'
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const MAX_DIM = 1600
 const QUALITY = 70
+const isImage = (name) => /\.(jpe?g|png|webp|heic|heif)$/i.test(name)
 
-if (!URL || !KEY) {
-  console.error('❌ SUPABASE_URL / SUPABASE_SERVICE_KEY 환경변수를 먼저 설정하세요.')
-  process.exit(1)
+// 프로젝트 목록 로드: projects.local.json 우선, 없으면 환경변수
+function loadProjects() {
+  const cfgPath = join(__dirname, 'projects.local.json')
+  if (existsSync(cfgPath)) {
+    const arr = JSON.parse(readFileSync(cfgPath, 'utf-8'))
+    return arr.filter(p => p.url && p.serviceKey)
+  }
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+    return [{ name: 'env', url: process.env.SUPABASE_URL, serviceKey: process.env.SUPABASE_SERVICE_KEY }]
+  }
+  return []
 }
 
-const sb = createClient(URL, KEY)
-
-async function listAll() {
-  const files = []
+// 버킷 내 폴더 재귀 순회하며 파일 경로 수집
+async function listFilesRecursive(sb, bucket, prefix = '') {
+  const out = []
   let offset = 0
   const limit = 100
   for (;;) {
-    const { data, error } = await sb.storage.from(BUCKET).list('', {
+    const { data, error } = await sb.storage.from(bucket).list(prefix, {
       limit, offset, sortBy: { column: 'name', order: 'asc' },
     })
     if (error) throw error
     if (!data || data.length === 0) break
-    // 폴더가 아닌 실제 파일만 (id 존재)
-    files.push(...data.filter(f => f.id))
+    for (const item of data) {
+      const path = prefix ? `${prefix}/${item.name}` : item.name
+      if (item.id) out.push(path)            // 파일 (id 있음)
+      else out.push(...await listFilesRecursive(sb, bucket, path))  // 폴더 → 재귀
+    }
     if (data.length < limit) break
     offset += limit
   }
-  return files
+  return out
 }
 
-function isImage(name) {
-  return /\.(jpe?g|png|webp|heic|heif)$/i.test(name)
-}
+async function compressBucket(sb, bucket, stats) {
+  const files = await listFilesRecursive(sb, bucket)
+  const images = files.filter(isImage)
+  console.log(`  📦 [${bucket}] 파일 ${files.length} / 이미지 ${images.length}`)
 
-async function run() {
-  console.log('📂 파일 목록 불러오는 중...')
-  const files = await listAll()
-  const images = files.filter(f => isImage(f.name))
-  console.log(`총 ${files.length}개 중 이미지 ${images.length}개\n`)
-
-  let done = 0, skipped = 0, failed = 0
-  let beforeTotal = 0, afterTotal = 0
-
-  for (const f of images) {
+  for (const path of images) {
     try {
-      const { data: blob, error: dErr } = await sb.storage.from(BUCKET).download(f.name)
+      const { data: blob, error: dErr } = await sb.storage.from(bucket).download(path)
       if (dErr) throw dErr
       const inputBuf = Buffer.from(await blob.arrayBuffer())
 
       const outBuf = await sharp(inputBuf)
-        .rotate() // EXIF 회전 보정
+        .rotate()
         .resize({ width: MAX_DIM, height: MAX_DIM, fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: QUALITY })
         .toBuffer()
 
-      // 압축 결과가 더 크면 건너뜀 (이미 작은 파일)
       if (outBuf.length >= inputBuf.length) {
-        skipped++
-        console.log(`⏭️  ${f.name}  (이미 작음, 유지: ${(inputBuf.length/1024).toFixed(0)}KB)`)
-        beforeTotal += inputBuf.length; afterTotal += inputBuf.length
+        stats.skipped++; stats.before += inputBuf.length; stats.after += inputBuf.length
         continue
       }
-
-      const { error: uErr } = await sb.storage.from(BUCKET).upload(f.name, outBuf, {
+      const { error: uErr } = await sb.storage.from(bucket).upload(path, outBuf, {
         upsert: true, contentType: 'image/jpeg', cacheControl: '3600',
       })
       if (uErr) throw uErr
-
-      beforeTotal += inputBuf.length; afterTotal += outBuf.length
-      done++
-      console.log(`✅ ${f.name}  ${(inputBuf.length/1024).toFixed(0)}KB → ${(outBuf.length/1024).toFixed(0)}KB`)
+      stats.done++; stats.before += inputBuf.length; stats.after += outBuf.length
+      console.log(`    ✅ ${path}  ${(inputBuf.length/1024).toFixed(0)}KB → ${(outBuf.length/1024).toFixed(0)}KB`)
     } catch (e) {
-      failed++
-      console.log(`❌ ${f.name}  실패: ${e.message ?? e}`)
+      stats.failed++
+      console.log(`    ❌ ${path}  실패: ${e.message ?? e}`)
     }
   }
+}
 
-  console.log('\n─────────────────────────────')
-  console.log(`압축 완료: ${done} / 유지: ${skipped} / 실패: ${failed}`)
-  console.log(`용량: ${(beforeTotal/1024/1024).toFixed(1)}MB → ${(afterTotal/1024/1024).toFixed(1)}MB`)
-  const saved = beforeTotal - afterTotal
-  if (beforeTotal > 0) console.log(`절감: ${(saved/1024/1024).toFixed(1)}MB (${(saved/beforeTotal*100).toFixed(0)}%)`)
+async function run() {
+  const projects = loadProjects()
+  if (projects.length === 0) {
+    console.error('❌ scripts/projects.local.json 또는 환경변수(SUPABASE_URL/SUPABASE_SERVICE_KEY)가 필요합니다.')
+    process.exit(1)
+  }
+  console.log(`🗂  대상 프로젝트 ${projects.length}개\n`)
+
+  const grand = { done: 0, skipped: 0, failed: 0, before: 0, after: 0 }
+
+  for (const proj of projects) {
+    console.log(`▶ 프로젝트: ${proj.name} (${proj.url})`)
+    const sb = createClient(proj.url, proj.serviceKey)
+    const { data: buckets, error } = await sb.storage.listBuckets()
+    if (error) { console.log(`  ❌ 버킷 목록 실패: ${error.message}`); continue }
+    if (!buckets || buckets.length === 0) { console.log('  (버킷 없음)'); continue }
+
+    const stats = { done: 0, skipped: 0, failed: 0, before: 0, after: 0 }
+    for (const b of buckets) {
+      await compressBucket(sb, b.name, stats)
+    }
+    console.log(`  └ 압축 ${stats.done} / 유지 ${stats.skipped} / 실패 ${stats.failed}  |  ${(stats.before/1024/1024).toFixed(1)}MB → ${(stats.after/1024/1024).toFixed(1)}MB\n`)
+    for (const k of Object.keys(grand)) grand[k] += stats[k]
+  }
+
+  console.log('═════════════════════════════')
+  console.log(`전체 압축 ${grand.done} / 유지 ${grand.skipped} / 실패 ${grand.failed}`)
+  console.log(`전체 용량: ${(grand.before/1024/1024).toFixed(1)}MB → ${(grand.after/1024/1024).toFixed(1)}MB`)
+  const saved = grand.before - grand.after
+  if (grand.before > 0) console.log(`전체 절감: ${(saved/1024/1024).toFixed(1)}MB (${(saved/grand.before*100).toFixed(0)}%)`)
 }
 
 run().catch(e => { console.error(e); process.exit(1) })

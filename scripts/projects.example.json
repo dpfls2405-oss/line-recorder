@@ -1,0 +1,4 @@
+[
+  { "name": "line-recorder", "url": "https://프로젝트1.supabase.co", "serviceKey": "여기에_service_role_키" },
+  { "name": "가공일지",       "url": "https://프로젝트2.supabase.co", "serviceKey": "여기에_service_role_키" }
+]
