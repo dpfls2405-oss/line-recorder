@@ -13,8 +13,15 @@ export default function DashboardPage() {
   const [filterLine, setFilterLine] = useState('ALL')
   const [filterItem, setFilterItem] = useState('ALL')
   const [groupBy, setGroupBy] = useState<'item'|'line'|'date'>('item')
+  const [storage, setStorage] = useState<{bucket:string;file_count:number;total_bytes:number}[]|null>(null)
 
   useEffect(() => { load() }, [dateFrom, dateTo, filterLine, filterItem])
+  useEffect(() => { loadStorage() }, [])
+
+  async function loadStorage() {
+    const { data } = await supabase.rpc('storage_usage')
+    if (data) setStorage(data as any)
+  }
 
   async function load() {
     setLoading(true)
@@ -60,8 +67,37 @@ export default function DashboardPage() {
   const tot = records.reduce((a,r)=>({ input:a.input+(r.input_qty??0), good:a.good+(r.good_qty??0), defect:a.defect+(r.defect_qty??0) }), {input:0,good:0,defect:0})
   const totYld = tot.input>0 ? tot.good/tot.input*100 : 0
 
+  const fmtMB = (b:number) => b >= 1024*1024*1024 ? (b/1024/1024/1024).toFixed(2)+' GB' : (b/1024/1024).toFixed(0)+' MB'
+  const storageTotal = storage ? storage.reduce((a,s)=>a+Number(s.total_bytes),0) : 0
+  const storageFiles = storage ? storage.reduce((a,s)=>a+Number(s.file_count),0) : 0
+  const storagePct = Math.min(100, storageTotal/(10*1024*1024*1024)*100) // 10GB 기준
+
   return (
     <div className="space-y-5">
+      {/* 스토리지 사용량 */}
+      <div className="bg-white rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-gray-800">스토리지 사용량</h2>
+            <span className="text-xs text-gray-400">(사진 실제 용량)</span>
+          </div>
+          <div className="text-sm">
+            <span className={`font-bold ${storageTotal < 10*1024*1024*1024 ? 'text-green-700' : 'text-red-600'}`}>{fmtMB(storageTotal)}</span>
+            <span className="text-gray-400"> / 10 GB · {storageFiles.toLocaleString()}장</span>
+          </div>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+          <div className={`h-full rounded-full ${storagePct<80?'bg-green-500':storagePct<95?'bg-amber-400':'bg-red-500'}`} style={{width:`${storagePct}%`}} />
+        </div>
+        {storage && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+            {[...storage].sort((a,b)=>Number(b.total_bytes)-Number(a.total_bytes)).map(s=>(
+              <span key={s.bucket}>{s.bucket} <b className="text-gray-700">{fmtMB(Number(s.total_bytes))}</b> ({Number(s.file_count).toLocaleString()})</span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* 필터 바 */}
       <div className="bg-white rounded-xl p-4 shadow-sm flex flex-wrap gap-4 items-end">
         <div>
